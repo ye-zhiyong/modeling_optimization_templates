@@ -61,7 +61,7 @@ class Model:
     # 1. data preprocess and feature engineering
     def data_preprocess_and_feature_engineering(self):
         # get and package dataset
-        dataset = pd.read_csv(self.dataset_path, header=0, index_col="sample")
+        dataset = pd.read_csv(self.dataset_path, header=0, index_col="sample")   # pd.read_csv(dataset_path, header, names, index_col, dtype, skiprows)
         dataset.columns = list(dataset.columns[:2]) + list(dataset.columns[2:].astype(float))
         input_features = dataset.columns[2:]
         inputs = dataset[input_features]

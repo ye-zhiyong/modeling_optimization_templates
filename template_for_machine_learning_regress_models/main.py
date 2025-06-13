@@ -271,7 +271,7 @@ class ModelingAndOptimization:
         )
         dump(model, 'model.joblib')
 
-    # test
+    # 4. test
     def test(self):
         # get test set
         _, test_set = self.dataset_split_train_test()

@@ -53,8 +53,25 @@ class Chart:
         )
         plt.show()
 
-# Model
-class Model:
+# Model and Optimizer
+class ModelAndOptimizer:
+    def __init__(self):
+        ""
+    
+    def predict(self, inputs_val):
+        ""
+        
+    def fit(self, inputs_train, outputs_train):
+        ""
+    
+    def save(self, filepath):
+        ""
+
+    def load(cls, filepath):
+        ""
+    
+# Modeling and Optimization
+class ModelingAndOptimization:
     def __init__(self, dataset_path):
         self.dataset_path = dataset_path
     
@@ -143,12 +160,8 @@ class Model:
 
         return dataset
 
-    # 2. modeling
-    def modeling(self):
-        print("modeling....")
 
-
-    # 3. split dataset to train set and test set
+    # 2. split dataset to train set and test set
     def dataset_split_train_test(self):
         # get data after data preprocess and feature engineering
         dataset  = self.data_preprocess_and_feature_engineering()
@@ -194,8 +207,8 @@ class Model:
 
         return train_set, test_set
 
-    # 4. optimization and cross validation
-    def optimization_and_validation(self):
+    # 3. cross validation
+    def cross_validation(self):
         # get train set
         train_set, _ = self.dataset_split_train_test()
 
@@ -216,7 +229,7 @@ class Model:
             inputs_train, inputs_val = train_set["inputs"].iloc[train_index], train_set["inputs"].iloc[val_index]
             outputs_train, outputs_val = train_set["outputs"].iloc[train_index], train_set["outputs"].iloc[val_index]
 
-            # optimization
+            # modeling and optimization
             model = RandomForestRegressor()
             model.fit(
                 inputs_train, 
@@ -240,7 +253,7 @@ class Model:
             erac_val.append(outputs_val[:, 1])
             erac_predict.append(outputs_predict[:, 1])  
 
-        # evaluation   
+        # validation set evaluation   
         print("\n------------------------------留一法交叉验证评估得分: ---------------------------------------")
         print("\n 油酸浓度评估: ")
         print("\n R² Score: ", r2_score(olac_val, olac_predict))
@@ -249,7 +262,7 @@ class Model:
         print("\n R² Score: ", r2_score(erac_val, erac_predict))
         print("\n RMSE: ", np.sqrt(mean_squared_error(erac_val, erac_predict)))
 
-        # optimization and save model
+        # Fullly modeling and optimization
         model = RandomForestRegressor()
         model.fit(
             train_set["inputs"], 
@@ -274,7 +287,7 @@ class Model:
         print("\n实际浓度: \n\n", test_set["outputs"])
         print("\n预测浓度: \n\n", outputs_predict)
 
-        # evaluation
+        # test set evaluation
         print("\n------------------------------测试集评估得分: -----------------------------------------------")
         print("\n 油酸浓度评估: ")
         print("\n R² Score: ", r2_score(test_set["outputs"][:, 0], outputs_predict[:, 0]))
@@ -286,8 +299,8 @@ class Model:
 
 if __name__ == "__main__":
 
-    model = Model("dataset.csv")
-    data = model.test()
+    model = ModelingAndOptimization("dataset.csv")
+    data = model.cross_validation()
 
     #chart = Chart(data)
     #chart.draw_heatmap()

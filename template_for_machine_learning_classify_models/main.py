@@ -65,8 +65,25 @@ class Chart:
         )
         plt.show()
 
-# Model
-class Model:
+# Model and Optimizer
+class ModelAndOptimizer:
+    def __init__(self):
+        ""
+    
+    def predict(self, inputs_val):
+        ""
+        
+    def fit(self, inputs_train, outputs_train):
+        ""
+    
+    def save(self, filepath):
+        ""
+
+    def load(cls, filepath):
+        ""
+
+# Modeling and Optimization
+class ModelingAndOptimization:
     def __init__(self, dataset_path):
         self.dataset_path = dataset_path
     
@@ -109,13 +126,8 @@ class Model:
         print(dataset)
 
         return dataset
-
-    # 2. modeling
-    def modeling(self):
-        print("modeling....")
-
-
-    # 3. split dataset to train set and test set
+        
+    # 2. split dataset to train set and test set
     def dataset_split_train_test(self):
         # get data after data preprocess and feature engineering
         dataset  = self.data_preprocess_and_feature_engineering()
@@ -161,8 +173,8 @@ class Model:
 
         return train_set, test_set
 
-    # 4. optimization and cross validation
-    def optimization_and_validation(self):
+    # 3. cross validation
+    def cross_validation(self):
         # get train set
         train_set, _ = self.dataset_split_train_test()
 
@@ -181,7 +193,7 @@ class Model:
             inputs_train, inputs_val = train_set["inputs"].iloc[train_index], train_set["inputs"].iloc[val_index]
             outputs_train, outputs_val = train_set["outputs"].iloc[train_index], train_set["outputs"].iloc[val_index]
 
-            # optimization
+            # modeling and optimization
             model = MultiOutputClassifier(SVC())
             model.fit(
                 inputs_train, 
@@ -197,7 +209,7 @@ class Model:
             year_vals.append(outputs_val.values)
             year_predicts.append(outputs_predict)
 
-        # evaluation   
+        # validation set evaluation   
         print(year_vals)
         print(year_predicts)
         print("\n------------------------------留一法交叉验证评估得分: ---------------------------------------")
@@ -227,7 +239,7 @@ class Model:
         print(f"加权平均F1分数: {f1:.4f}")
         
         
-        # optimization and save model
+        # Fullly modeling and optimization
         model = MultiOutputClassifier(SVC())
         model.fit(
             train_set["inputs"], 
@@ -235,7 +247,7 @@ class Model:
         )
         dump(model, 'model.joblib')
 
-    # test
+    # 4. test
     def test(self):
         # get test set
         _, test_set = self.dataset_split_train_test()
@@ -244,9 +256,9 @@ class Model:
         model = load('model.joblib')
         outputs_predict = model.predict(test_set["inputs"])
 
+        # test set evaluation
         year_vals = test_set["outputs"]
         year_predicts = outputs_predict
-        # inverse standardization/normalization
         print(year_vals)
         print(year_predicts)
         print("\n------------------------------------混淆矩阵：: -------------------------------------------\n")
@@ -271,15 +283,10 @@ class Model:
         print(f"加权平均召回率: {recall:.4f}")
         print(f"加权平均F1分数: {f1:.4f}")
 
-        # evaluation
-
-          
-
-
 if __name__ == "__main__":
 
-    model = Model("dataset_iris.csv")
-    data = model.optimization_and_validation()
+    model = ModelingAndOptimization("dataset_iris.csv")
+    data = model.cross_validation()
 
     #chart = Chart(data)
     #chart.draw_2D_line_chart()

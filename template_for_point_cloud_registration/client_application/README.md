@@ -1,8 +1,10 @@
 # Run
-'python ./main.py'
+```python
+python ./main.py
+```
 
 # Build -> EXE
-'pyinstaller ./build.spec '
+pyinstaller ./build.spec
 
 # Client Application Instructions
 1、注意路径选择中，不要含有中文和空格。

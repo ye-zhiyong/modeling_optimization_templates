@@ -188,7 +188,7 @@ class ModelingAndOptimization:
         for train_index, val_index in loo.split(train_set["inputs"]):
             num = num + 1
             # split train set and validation set
-            print(f"\n-------------------------第{num}次验证----------------------------------------------------------")
+            print(f"\n-------------------------Validation No.{num}----------------------------------------------------------")
             print(f"\n train indices: {train_index}, test indices: {val_index}")
             inputs_train, inputs_val = train_set["inputs"].iloc[train_index], train_set["inputs"].iloc[val_index]
             outputs_train, outputs_val = train_set["outputs"].iloc[train_index], train_set["outputs"].iloc[val_index]
@@ -212,16 +212,15 @@ class ModelingAndOptimization:
         # validation set evaluation   
         print(year_vals)
         print(year_predicts)
-        print("\n------------------------------留一法交叉验证评估得分: ---------------------------------------")
-        print("\n 实际与预测结果: \n")
+        print("\n------------------------------Cross Validation Results--------------------------------------------")
         for i in range(len(year_vals)):
-            print(f"真实年份: {year_vals[i]}, 预测年份: {year_predicts[i]} \n")
-        print("\n------------------------------------混淆矩阵：: -------------------------------------------\n")
+            print(f"true value: {year_vals[i]}, pred value: {year_predicts[i]} \n")
+        print("\n------------------------------------Confusion Matrix---------------------------------------------\n")
         y_true = np.array(year_vals).squeeze() 
         y_pred = np.array(year_predicts).squeeze()  
         cm = confusion_matrix(y_true, y_pred)
         print(cm)
-        print("\n----------------------------------混淆矩阵可视化: -----------------------------------------\n")
+        print("\n----------------------------------Confusion Matrix's Visualization -----------------------------\n")
         plt.figure(figsize=(8, 6))  # visualization
         sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', 
                     xticklabels=np.unique(y_true), 
@@ -230,13 +229,13 @@ class ModelingAndOptimization:
         plt.ylabel('True')
         plt.title('Confusion Matrix (Single Output)')
         plt.show()
-        print("\n-----------------------------------分类指标报告: -----------------------------------------\n")
+        print("\n-----------------------------------Classification Score------------------------------------------\n")
         precision = precision_score(y_true, y_pred, average='weighted')
         recall = recall_score(y_true, y_pred, average='weighted')
         f1 = f1_score(y_true, y_pred, average='weighted')
-        print(f"加权平均查准率: {precision:.4f}")
-        print(f"加权平均召回率: {recall:.4f}")
-        print(f"加权平均F1分数: {f1:.4f}")
+        print(f"Precise: {precision:.4f}")
+        print(f"Recall: {recall:.4f}")
+        print(f"F1 Score: {f1:.4f}")
         
         
         # Fullly modeling and optimization
@@ -261,12 +260,12 @@ class ModelingAndOptimization:
         year_predicts = outputs_predict
         print(year_vals)
         print(year_predicts)
-        print("\n------------------------------------混淆矩阵：: -------------------------------------------\n")
+        print("\n------------------------------------Confusion Matrix--------------------------------------------\n")
         y_true = np.array(year_vals).squeeze() 
         y_pred = np.array(year_predicts).squeeze()  
         cm = confusion_matrix(y_true, y_pred)
         print(cm)
-        print("\n----------------------------------混淆矩阵可视化: -----------------------------------------\n")
+        print("\n-----------------------------------Confusion Matrix's Visualization -----------------------------\n")
         plt.figure(figsize=(8, 6))  # visualization
         sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', 
                     xticklabels=np.unique(y_true), 
@@ -275,13 +274,13 @@ class ModelingAndOptimization:
         plt.ylabel('True')
         plt.title('Confusion Matrix (Single Output)')
         plt.show()
-        print("\n-----------------------------------分类指标报告: -----------------------------------------\n")
+        print("\n-----------------------------------Classification Score------------------------------------------\n")
         precision = precision_score(y_true, y_pred, average='weighted')
         recall = recall_score(y_true, y_pred, average='weighted')
         f1 = f1_score(y_true, y_pred, average='weighted')
-        print(f"加权平均查准率: {precision:.4f}")
-        print(f"加权平均召回率: {recall:.4f}")
-        print(f"加权平均F1分数: {f1:.4f}")
+        print(f"Precise: {precision:.4f}")
+        print(f"Recall: {recall:.4f}")
+        print(f"F1 Score: {f1:.4f}")
 
 if __name__ == "__main__":
 

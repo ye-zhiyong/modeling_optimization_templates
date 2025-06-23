@@ -4,15 +4,19 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
+from sklearn.cross_decomposition import PLSCanonical, PLSRegression
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
 from pybaselines import Baseline
 from sklearn.model_selection import LeaveOneOut, train_test_split
-from sklearn.cross_decomposition import PLSRegression
+from sklearn.linear_model import LinearRegression
 from sklearn.multioutput import MultiOutputRegressor
 from sklearn.metrics import mean_squared_error, r2_score
 from sklearn.metrics.pairwise import cosine_similarity
+from scipy.optimize import minimize, least_squares
 from joblib import dump, load
+import pickle
+from pathlib import Path
 
 # Chart
 class Chart:
@@ -29,9 +33,10 @@ class Chart:
         plt.grid(linestyle="--", alpha=0.3)
 
         # draw line one by one
-        for sample_label in self.data["sample_labels"]:
-            X = self.data["input_features"]
-            Y = self.data["inputs"].loc[sample_label]
+        #for sample_label in self.data["sample_labels"]:
+        for sample_label in range(1, 5000):
+            X = self.data["output_features"]
+            Y = self.data["outputs"].loc[sample_label]
             plt.plot(X, Y, label = sample_label)
         
         # add legend
@@ -69,7 +74,7 @@ class ModelAndOptimizer:
 
     def load(cls, filepath):
         ""
-    
+
 # Modeling and Optimization
 class ModelingAndOptimization:
     def __init__(self, dataset_path):
@@ -78,12 +83,13 @@ class ModelingAndOptimization:
     # 1. data preprocess and feature engineering
     def data_preprocess_and_feature_engineering(self):
         # get and package dataset
-        dataset = pd.read_csv(self.dataset_path, header=0, index_col="sample")   # pd.read_csv(dataset_path, header, names, index_col, dtype, skiprows)
-        dataset.columns = list(dataset.columns[:2]) + list(dataset.columns[2:].astype(float))
-        input_features = dataset.columns[2:]
-        inputs = dataset[input_features]
-        output_features = dataset.columns[0:2]
-        outputs = dataset[output_features]
+        dataset = pd.read_csv(self.dataset_path, header=0)   # pd.read_csv(dataset_path, header, names, index_col, dtype, skiprows)
+        dataset.columns = list(dataset.columns[:5]) + list(dataset.columns[5:].astype(float))
+        #dataset= dataset[dataset["method"] == "cAg@785"]  #  cAg@785
+        input_features = dataset.columns[:5]
+        inputs = dataset[input_features].astype(float)
+        output_features = dataset.columns[5:]
+        outputs = dataset[output_features].astype(float)
         sample_labels = dataset.index.tolist()
         sample_weights = {label : 1.0 for label in sample_labels}
         dataset = {
@@ -103,40 +109,42 @@ class ModelingAndOptimization:
         corrected_spectra = []
         baseline_fitter = Baseline()
         for sample_label in dataset["sample_labels"]:
-            spectrum = dataset["inputs"].loc[sample_label].values.reshape(-1, 1)  # 转换为列向量
+            spectrum = dataset["outputs"].loc[sample_label].values.reshape(-1, 1)  # 转换为列向量
             baselines, params = baseline_fitter.airpls(spectrum, 1e5)  # 调整参数 lam 和 p
             corrected_spectrum = spectrum.flatten() - baselines.flatten()
             corrected_spectra.append(corrected_spectrum)
-        dataset["inputs"] = pd.DataFrame(
+        dataset["outputs"] = pd.DataFrame(
             corrected_spectra, 
             index = dataset["sample_labels"], 
-            columns = dataset["input_features"]
+            columns = dataset["output_features"]
         )
 
         # abstract critical feature peaks' integration
-        mask_C2C = ((dataset["input_features"] >= 1630) & (dataset["input_features"] <= 1665))  #C=C伸缩振动 
-        mask_CH2 = ((dataset["input_features"] >= 1440) & (dataset["input_features"] <= 1460))  #CH2伸缩振动 
-        mask_C_H = ((dataset["input_features"] >= 1290) & (dataset["input_features"] <= 1320))  #CH2扭曲振动，芥酸更强
-        mask_CH2N = ((dataset["input_features"] >= 850) & (dataset["input_features"] <= 880))   #CH2面外摇摆震动 
-        mask_C_C = ((dataset["input_features"] >= 1060) & (dataset["input_features"] <= 1100))  #C-C伸缩振动，长链芥酸更强  
-        I_C2C = dataset["inputs"].loc[:, mask_C2C].sum(axis=1).to_frame(name = 'I_C2C')
-        I_CH2 = dataset["inputs"].loc[:, mask_CH2].sum(axis=1).to_frame(name = 'I_CH2')
-        I_C_H = dataset["inputs"].loc[:, mask_C_H].sum(axis=1).to_frame(name = 'I_C_H')
-        I_CH2N = dataset["inputs"].loc[:, mask_CH2N].sum(axis=1).to_frame(name = 'I_CH2N')
-        I_C_C = dataset["inputs"].loc[:, mask_C_C].sum(axis=1).to_frame(name = 'I_C_C')
-        dataset["inputs"] = pd.concat([I_C2C, I_CH2, I_C_H, I_CH2N, I_C_C], axis = 1)
-        dataset["input_features"] = pd.Index(['I_C2C', 'I_CH2', 'I_C_H', 'I_CH2N', 'I_C_C'])
+        mask_1 = ((dataset["output_features"] >= 20) & (dataset["output_features"] <= 110))     # 特征峰1
+        mask_2 = ((dataset["output_features"] >= 200) & (dataset["output_features"] <= 300))    # 特征峰2
+        mask_3 = ((dataset["output_features"] >= 310) & (dataset["output_features"] <= 450))    # 特征峰3
+        mask_4 = ((dataset["output_features"] >= 450) & (dataset["output_features"] <= 530))    # 特征峰4
+        mask_5 = ((dataset["output_features"] >= 590) & (dataset["output_features"] <= 610))    # 特征峰5
+        mask_6 = ((dataset["output_features"] >= 700) & (dataset["output_features"] <= 730))    # 特征峰6
+        I_1 = dataset["outputs"].loc[:, mask_1].sum(axis=1).to_frame(name = 'I_1')
+        I_2 = dataset["outputs"].loc[:, mask_2].sum(axis=1).to_frame(name = 'I_2')
+        I_3 = dataset["outputs"].loc[:, mask_3].sum(axis=1).to_frame(name = 'I_3')
+        I_4 = dataset["outputs"].loc[:, mask_4].sum(axis=1).to_frame(name = 'I_4')
+        I_5 = dataset["outputs"].loc[:, mask_5].sum(axis=1).to_frame(name = 'I_5')
+        I_6 = dataset["outputs"].loc[:, mask_6].sum(axis=1).to_frame(name = 'I_6')
+        dataset["outputs"] = pd.concat([I_1, I_2, I_3, I_4, I_5, I_6], axis = 1)
+        dataset["output_features"] = ['I_1', 'I_2', 'I_3', 'I_4', 'I_5', 'I_6']
 
         # standardization
-        scaler_inputs = StandardScaler()
-        dataset["inputs"] = scaler_inputs.fit_transform(dataset["inputs"])
+        scaler_inputs = MinMaxScaler()
+        dataset["inputs"] = scaler_inputs.fit_transform(dataset["inputs"].values.reshape(-1, 1))
         dump(scaler_inputs, 'scaler_inputs.joblib')
         dataset["inputs"] = pd.DataFrame(
             dataset["inputs"], 
             index = dataset["sample_labels"], 
             columns = dataset["input_features"]
         )
-        scaler_outputs = StandardScaler()
+        scaler_outputs = MinMaxScaler()
         dataset["outputs"] = scaler_outputs.fit_transform(dataset["outputs"])
         dump(scaler_outputs, 'scaler_outputs.joblib')
         dataset["outputs"] = pd.DataFrame(
@@ -159,8 +167,7 @@ class ModelingAndOptimization:
         print(dataset)
 
         return dataset
-
-
+            
     # 2. split dataset to train set and test set
     def dataset_split_train_test(self):
         # get data after data preprocess and feature engineering
@@ -211,91 +218,106 @@ class ModelingAndOptimization:
     def cross_validation(self):
         # get train set
         train_set, _ = self.dataset_split_train_test()
-
-        # predicted results buffer
-        olac_val = []
-        olac_predict = []
-        erac_val = []
-        erac_predict = []
         
+        # val results buffer
+        true_values, pred_values = [], []
+
         # cross validation
         loo = LeaveOneOut()
         num = 0
         for train_index, val_index in loo.split(train_set["inputs"]):
             num = num + 1
             # split train set and validation set
-            print(f"\n-------------------------第{num}次验证----------------------------------------------------------")
+            print(f"\n--------------------------------Validation No.{num}--------------------------------------------------")
             print(f"\n train indices: {train_index}, test indices: {val_index}")
             inputs_train, inputs_val = train_set["inputs"].iloc[train_index], train_set["inputs"].iloc[val_index]
             outputs_train, outputs_val = train_set["outputs"].iloc[train_index], train_set["outputs"].iloc[val_index]
 
             # modeling and optimization
-            model = RandomForestRegressor()
-            model.fit(
-                inputs_train, 
-                outputs_train, 
-                sample_weight = [train_set["sample_weights"][label] for label in inputs_train.index.to_list()]
-            )
-
+            model = PLSRegression()
+            model.fit(inputs_train, outputs_train)
+            
             # predict
-            outputs_predict = model.predict(inputs_val)
-
+            inputs_pred = model.predict(outputs_val)
+            
             # inverse standardization/normalization
-            scaler_outputs = load('scaler_outputs.joblib')
-            outputs_val = scaler_outputs.inverse_transform(outputs_val)
-            outputs_predict = scaler_outputs.inverse_transform(outputs_predict)
-            print("\n实际浓度: \n\n", outputs_val)
-            print("\n预测浓度: \n\n", outputs_predict)
-
+            scaler_inputs = load('scaler_inputs.joblib')
+            inputs_val = scaler_inputs.inverse_transform(inputs_val)
+            inputs_pred = scaler_inputs.inverse_transform(inputs_pred)
+            
             # save predicted results
-            olac_val.append(outputs_val[:, 0])
-            olac_predict.append(outputs_predict[:, 0])
-            erac_val.append(outputs_val[:, 1])
-            erac_predict.append(outputs_predict[:, 1])  
+            print(f"True: {inputs_val}, Pred: {inputs_pred}")
+            true_values.append(inputs_val.to_numpy().flatten())
+            pred_values.append(inputs_pred.flatten())
 
-        # validation set evaluation   
-        print("\n------------------------------留一法交叉验证评估得分: ---------------------------------------")
-        print("\n 油酸浓度评估: ")
-        print("\n R² Score: ", r2_score(olac_val, olac_predict))
-        print("\n RMSE: ", np.sqrt(mean_squared_error(olac_val, olac_predict)))
-        print("\n 芥酸浓度评估: ")
-        print("\n R² Score: ", r2_score(erac_val, erac_predict))
-        print("\n RMSE: ", np.sqrt(mean_squared_error(erac_val, erac_predict)))
 
-        # Fullly modeling and optimization
-        model = RandomForestRegressor()
-        model.fit(
-            train_set["inputs"], 
-            train_set["outputs"], 
-            sample_weight = [train_set["sample_weights"][label] for label in train_set["inputs"].index.to_list()]
-        )
+        # evaluation
+        if len(true_values) > 0:
+            # R² and RMSE
+            print(f"\n-------------------------Cross Validation Results----------------------------------------------------------")
+            print(f"R²: {r2_score(true_values, pred_values):.4f}")
+            print(f"RMSE: {np.sqrt(mean_squared_error(true_values, pred_values)):.4f}")
+            
+            # visualization
+            plt.scatter(true_values, pred_values)
+            plt.plot([min(true_values), max(true_values)], [min(true_values), max(true_values)], 'r--')
+            plt.xlabel('True Value')
+            plt.ylabel('Predicted Value')
+            plt.title('Cross Validation Results')
+            plt.show()
+        else:
+            print("There are no valid prediction results for evaluation")
+
+        # Fully modeling and optimization
+        model = ModelAndOptimizer()
+        model.fit(train_set["inputs"], train_set["outputs"])
         dump(model, 'model.joblib')
-
+        print("The model has been saved as model.joblib")
+        
     # 4. test
     def test(self):
         # get test set
         _, test_set = self.dataset_split_train_test()
         
+        # load model
+        model = load('model_pls.joblib')
+        
         # predict
-        model = load('model.joblib')
-        outputs_predict = model.predict(test_set["inputs"])
-
-        # inverse standardization/normalization
-        scaler_outputs = load('scaler_outputs.joblib')
-        test_set["outputs"] = scaler_outputs.inverse_transform(test_set["outputs"])
-        outputs_predict = scaler_outputs.inverse_transform(outputs_predict)
-        print("\n实际浓度: \n\n", test_set["outputs"])
-        print("\n预测浓度: \n\n", outputs_predict)
-
-        # test set evaluation
-        print("\n------------------------------测试集评估得分: -----------------------------------------------")
-        print("\n 油酸浓度评估: ")
-        print("\n R² Score: ", r2_score(test_set["outputs"][:, 0], outputs_predict[:, 0]))
-        print("\n RMSE: ", np.sqrt(mean_squared_error(test_set["outputs"][:, 0], outputs_predict[:, 0])))
-        print("\n 芥酸浓度评估: ")
-        print("\n R² Score: ", r2_score(test_set["outputs"][:, 1], outputs_predict[:, 1]))
-        print("\n RMSE: ", np.sqrt(mean_squared_error(test_set["outputs"][:, 1], outputs_predict[:, 1])))        
-
+        inputs_test = test_set["inputs"].values  
+        outputs_test = test_set["outputs"].values  
+        outputs_pred = model.predict(inputs_test)
+        
+        # evaluation
+        print("\n-----------------------------------Test Results------------------------------------------------------")
+        evaluation_results = []
+        for i in range(outputs_test.shape[1]):
+            r2 = r2_score(outputs_test[:, i], outputs_pred[:, i])
+            rmse = np.sqrt(mean_squared_error(outputs_test[:, i], outputs_pred[:, i]))
+            evaluation_results.append((r2, rmse))
+            print(f"\output {i+1}'s evaluation:")
+            print(f"R² Score: {r2:.4f}")
+            print(f"RMSE: {rmse:.4f}")
+        
+        # visualization
+        plt.figure(figsize=(12, 8))
+        n_components = outputs_test.shape[1]
+        cols = min(3, n_components)
+        rows = (n_components - 1) // cols + 1
+        for i in range(n_components):
+            plt.subplot(rows, cols, i+1)
+            plt.scatter(outputs_test[:, i], outputs_pred[:, i], alpha=0.6, label='Sample')
+            plt.plot([outputs_test[:, i].min(), outputs_test[:, i].max()], 
+                    [outputs_test[:, i].min(), outputs_test[:, i].max()], 
+                    'r--', label='Ideal Line')
+            slope, intercept = np.polyfit(outputs_test[:, i], outputs_pred[:, i], 1)
+            plt.plot(outputs_test[:, i], slope*outputs_test[:, i] + intercept, 
+                    'b-', label='Regression Line')
+            plt.xlabel(f'true value {i+1}')
+            plt.ylabel(f'pred value {i+1}')
+            plt.title(f'Output {i+1} (R²={evaluation_results[i][0]:.2f})')
+            plt.legend()
+        plt.tight_layout()
+        plt.show()
 
 if __name__ == "__main__":
 
@@ -303,4 +325,4 @@ if __name__ == "__main__":
     data = model.cross_validation()
 
     #chart = Chart(data)
-    #chart.draw_heatmap()
+    #chart.draw_2D_line_chart()

@@ -5,6 +5,7 @@ from matplotlib.scale import scale_factory
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+from param import produce_value
 import seaborn as sns
 from sklearn.svm import SVC
 from sklearn.ensemble import RandomForestRegressor
@@ -16,6 +17,8 @@ from sklearn.multioutput import MultiOutputClassifier, MultiOutputRegressor
 from sklearn.metrics import  confusion_matrix, precision_score, recall_score, f1_score
 from sklearn.metrics.pairwise import cosine_similarity
 from joblib import dump, load
+from scipy.signal import savgol_filter
+
 
 # Chart
 class Chart:
@@ -27,24 +30,21 @@ class Chart:
         # configure the figure, title, xlabel, ylabel, etc.
         plt.figure(figsize=(10, 6))
         plt.title("Spectrogram")
-        plt.xlabel("Raman Shift(cm⁻¹)")
+        plt.xlabel("Wave Length(cm⁻¹)")
         plt.ylabel("Intensity(a.u.)")
         plt.grid(linestyle="--", alpha=0.3)
 
         # draw line one by one
         for sample_label in self.data["sample_labels"]:
-            X = self.data["input_features"]
-            Y = self.data["inputs"].loc[sample_label]
+            X = self.data["input_features"][4:]
+            Y = self.data["inputs"].loc[sample_label][4:]
             cls = self.data["outputs"].loc[sample_label].values
+            #cls = self.data["inputs"].loc[sample_label][2]
             
-            if  cls == 2020:
+            if  cls == 0:
                 plt.plot(X, Y, color = "red", label = cls)
-            elif  cls == 2021:
+            elif  cls == 1:
                 plt.plot(X, Y, color = "blue",  label = cls)
-            elif  cls == 2022:
-                plt.plot(X, Y, color = "yellow", label = cls)
-            elif  cls == 2023:
-                plt.plot(X, Y, color = "black", label = cls)
         
         # add legend
         plt.legend(loc="upper right")
@@ -90,8 +90,9 @@ class ModelingAndOptimization:
     # 1. data preprocess and feature engineering
     def data_preprocess_and_feature_engineering(self):
         # get and package dataset
-        dataset = pd.read_csv(self.dataset_path, header = None)  # header, names, index_col, datype, skiprows
-        input_features = dataset.columns[2:]
+        dataset = pd.read_csv(self.dataset_path, header = 0, index_col = "sample")  # header, names, index_col, datype, skiprows
+        dataset.columns = list(dataset.columns[:5]) + list(dataset.columns[5:].astype(float))
+        input_features = dataset.columns[1:]
         inputs = dataset[input_features]
         output_features = dataset.columns[0:1]
         outputs = dataset[output_features]
@@ -110,10 +111,46 @@ class ModelingAndOptimization:
         print("\n-----------------------dataset before data preprocess and feature engineering---------------------------\n")
         print(dataset)
 
-        # baselines correction
+        # divide by the reference
+        cols_to_process = dataset["input_features"][4:]  
+        dataset["inputs"][cols_to_process] = dataset["inputs"][cols_to_process].astype(float)
+        divisor = dataset["inputs"][131].astype(float)
+        divisor = divisor.replace(0, np.nan)
+        dataset["inputs"][cols_to_process] = dataset["inputs"][cols_to_process].apply(
+            lambda x: x / divisor, 
+            axis=0
+        )
+        dataset["inputs"][cols_to_process] = dataset["inputs"][cols_to_process].replace(
+            [np.inf, -np.inf], 
+            np.nan
+        )
 
+        # SGD
+        dataset["inputs"][cols_to_process] = savgol_filter(dataset["inputs"][cols_to_process], 
+                            window_length=11,  
+                            polyorder=2,     
+                            deriv=1,         
+                            delta=1.0)      
+        dataset["inputs"][cols_to_process] = dataset["inputs"][cols_to_process].replace(
+            [np.inf, -np.inf], np.nan
+        )
 
-        # abstract critical feature peaks' integration
+        # delete input_features including temp, humidity, etc.
+        dataset["inputs"] = dataset["inputs"][cols_to_process]
+        dataset["input_features"] = cols_to_process
+
+        # abstract critical feature peaks
+        column_ranges = [
+            slice(145, 156),  
+            slice(200, 226)   
+        ]
+        selected_indices = []
+        for r in column_ranges:
+            selected_indices.extend(list(range(r.start, r.stop)))
+        dataset["inputs"] = dataset["inputs"].iloc[:, selected_indices]
+        dataset["input_features"] = dataset["input_features"][selected_indices]
+
+        # reduce the size of data set
 
         # standardization
 
@@ -126,6 +163,7 @@ class ModelingAndOptimization:
         print(dataset)
 
         return dataset
+
         
     # 2. split dataset to train set and test set
     def dataset_split_train_test(self):
@@ -179,8 +217,7 @@ class ModelingAndOptimization:
         train_set, _ = self.dataset_split_train_test()
 
         # predicted results buffer
-        year_vals = []
-        year_predicts = []
+        true_values, pred_values = [], []
         
         # cross validation
         loo = LeaveOneOut()
@@ -206,18 +243,18 @@ class ModelingAndOptimization:
             # inverse standardization/normalization
 
             # save predicted results
-            year_vals.append(outputs_val.values)
-            year_predicts.append(outputs_predict)
+            true_values.append(outputs_val.values)
+            pred_values.append(outputs_predict)
 
         # validation set evaluation   
-        print(year_vals)
-        print(year_predicts)
+        print(true_values)
+        print(pred_values)
         print("\n------------------------------Cross Validation Results--------------------------------------------")
-        for i in range(len(year_vals)):
-            print(f"true value: {year_vals[i]}, pred value: {year_predicts[i]} \n")
+        for i in range(len(true_values)):
+            print(f"true value: {true_values[i]}, pred value: {pred_values[i]} \n")
         print("\n------------------------------------Confusion Matrix---------------------------------------------\n")
-        y_true = np.array(year_vals).squeeze() 
-        y_pred = np.array(year_predicts).squeeze()  
+        y_true = np.array(true_values).squeeze() 
+        y_pred = np.array(pred_values).squeeze()  
         cm = confusion_matrix(y_true, y_pred)
         print(cm)
         print("\n----------------------------------Confusion Matrix's Visualization -----------------------------\n")
@@ -256,35 +293,35 @@ class ModelingAndOptimization:
         outputs_predict = model.predict(test_set["inputs"])
 
         # test set evaluation
-        year_vals = test_set["outputs"]
-        year_predicts = outputs_predict
-        print(year_vals)
-        print(year_predicts)
+        true_values = test_set["outputs"]
+        pred_values = outputs_predict
+        print(true_values)
+        print(pred_values)
         print("\n------------------------------------Confusion Matrix--------------------------------------------\n")
-        y_true = np.array(year_vals).squeeze() 
-        y_pred = np.array(year_predicts).squeeze()  
-        cm = confusion_matrix(y_true, y_pred)
+        true_values = np.array(true_values).squeeze() 
+        pred_values = np.array(pred_values).squeeze()  
+        cm = confusion_matrix(true_values, pred_values)
         print(cm)
         print("\n-----------------------------------Confusion Matrix's Visualization -----------------------------\n")
         plt.figure(figsize=(8, 6))  # visualization
         sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', 
-                    xticklabels=np.unique(y_true), 
-                    yticklabels=np.unique(y_true))
+                    xticklabels=np.unique(true_values), 
+                    yticklabels=np.unique(true_values))
         plt.xlabel('Predicted')
         plt.ylabel('True')
         plt.title('Confusion Matrix (Single Output)')
         plt.show()
         print("\n-----------------------------------Classification Score------------------------------------------\n")
-        precision = precision_score(y_true, y_pred, average='weighted')
-        recall = recall_score(y_true, y_pred, average='weighted')
-        f1 = f1_score(y_true, y_pred, average='weighted')
+        precision = precision_score(true_values, pred_values, average='weighted')
+        recall = recall_score(true_values, pred_values, average='weighted')
+        f1 = f1_score(true_values, pred_values, average='weighted')
         print(f"Precise: {precision:.4f}")
         print(f"Recall: {recall:.4f}")
         print(f"F1 Score: {f1:.4f}")
 
 if __name__ == "__main__":
 
-    model = ModelingAndOptimization("dataset_iris.csv")
+    model = ModelingAndOptimization("dataset.csv")
     data = model.cross_validation()
 
     #chart = Chart(data)

@@ -79,7 +79,12 @@ def reflc_hypspec_calc(grain_hdr, grain_os, white_hdr, white_os, reflc_hdr, refl
         elif src_dtype == np.uint16:
             spe_grain.metadata['data type'] = 12
         metadata = spe_grain.metadata
-        metadata['interleave'] = 'bsq'
+        metadata.update({
+            'lines': min(r_g, r_w),      # 更新行数
+            'samples': min(c_g, c_w),     # 更新列数（建议同步检查）
+            'bands': b_g,                # 波段数保持不变
+            'interleave': 'bsq'
+        })
         envi.write_envi_header(reflc_hdr, metadata)
 
         return reflc_hypspec

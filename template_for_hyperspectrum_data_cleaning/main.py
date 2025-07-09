@@ -165,20 +165,26 @@ if __name__ == '__main__':
             reflc_hypspec_downsampled = reflc_hypspec[:, non_zero_mask]  # (b, w, h) ——> (b, n)
             print("hyperspectrum after downsampling: ", reflc_hypspec_downsampled.shape)
 
-            # get the average value for every 10000 pixels
-            bands, n_pixels = reflc_hypspec_downsampled.shape
-            n_groups = int(np.ceil(n_pixels / 20000))  
-            averaged_data = np.zeros((bands, n_groups))
-            for group_idx in range(n_groups):
-                start = group_idx * 20000
-                end = min((group_idx + 1) * 20000, n_pixels)  
-                group_pixels = reflc_hypspec_downsampled[:, start:end]
-                averaged_data[:, group_idx] = np.mean(group_pixels, axis=1)  
-            print("hyperspectrum after getting mean value: ", averaged_data.shape)
+            # get the average value for sample-level
+            averaged_data = np.mean(reflc_hypspec_downsampled, axis = 1)
+            row = [sample_name] + averaged_data.tolist()  
+            writer.writerow(row)
+            print(f"The mean reflc of the sample {sample_name} have been written to CSV.\n")
+            
+            # get the average value for 10k-pixels-level
+            #bands, n_pixels = reflc_hypspec_downsampled.shape
+            #n_groups = int(np.ceil(n_pixels / 20000))  
+            #averaged_data = np.zeros((bands, n_groups))
+            #for group_idx in range(n_groups):
+                #start = group_idx * 20000
+                #end = min((group_idx + 1) * 20000, n_pixels)  
+                #group_pixels = reflc_hypspec_downsampled[:, start:end]
+                #averaged_data[:, group_idx] = np.mean(group_pixels, axis=1)  
+            #print("hyperspectrum after getting mean value: ", averaged_data.shape)
 
             # write in csv
-            for pixel_idx in range(averaged_data.shape[1]):
-                pixel_data = averaged_data[:, pixel_idx]  
-                row = [sample_name] + pixel_data.tolist()  
-                writer.writerow(row)
-            print(f"The {averaged_data.shape[1]} mean pixels of the sample {sample_name} have been written to CSV.\n")
+            #for pixel_idx in range(averaged_data.shape[1]):
+                #pixel_data = averaged_data[:, pixel_idx]  
+                #row = [sample_name] + pixel_data.tolist()  
+                #writer.writerow(row)
+            #print(f"The {averaged_data.shape[1]} mean pixels of the sample {sample_name} have been written to CSV.\n")
